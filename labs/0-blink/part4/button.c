@@ -30,6 +30,7 @@ unsigned get32(const volatile void *addr);
 volatile unsigned *gpio_fsel0 = (volatile unsigned *)(GPIO_BASE + 0x00);
 volatile unsigned *gpio_set0  = (volatile unsigned *)(GPIO_BASE + 0x1C);
 volatile unsigned *gpio_clr0  = (volatile unsigned *)(GPIO_BASE + 0x28);
+volatile unsigned *gpio_lvl   = (volatile unsigned *)(GPIO_BASE + 0x34);
 
 // set <pin> to output.  note: fsel0, fsel1, fsel2 are contiguous in memory,
 // so you can use array calculations!
@@ -61,10 +62,20 @@ void gpio_set_off(unsigned pin) {
 // set <pin> to input.
 void gpio_set_input(unsigned pin) {
     // use gpio_fsel0  
+    unsigned reg = pin / 10;
+    unsigned off = (pin % 10) * 3;
+
+    volatile unsigned *gpio_fsel = gpio_fsel0 + reg;
+    (*gpio_fsel) &= ~(0b111 << off);
 }
 // set <pin> to <v> (v \in {0,1})
 void gpio_write(unsigned pin, unsigned v) {
     // 
+}
+
+int gpio_read(unsigned pin) {
+    unsigned levels = (*gpio_lvl);
+    return (levels & (0x1 << pin)) != 0;
 }
 
 // countdown 'ticks' cycles; the asm probably isn't necessary.
@@ -77,11 +88,14 @@ void delay(unsigned ticks) {
 // usb connection out.
 void notmain(void) {
     int led = 20;
+    int but = 21;
     gpio_set_output(led);
-    for(int i = 0; i < 10; i++) {
-        gpio_set_on(led);
-        delay(1000000);
-        gpio_set_off(led);
+    gpio_set_input(but);
+    while (1) {
+        if (gpio_read(but))
+           gpio_set_on(led);
+        else
+            gpio_set_off(led);
         delay(1000000);
     }
 }
