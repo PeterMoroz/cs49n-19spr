@@ -78,10 +78,18 @@ static void print_read(mem_t *m) {
  *  - put32
  */
 
+#define N 1024
+static mem_t mem[N];
+
 // lookup <addr> in your memory implementation.  Returns the associated <mem_t>
 // or 0 if there is none (null).
 static mem_t* lookup(volatile void *addr) {
-    unimplemented();
+    for (size_t i = 0; i < N; i++) {
+        if (mem[i].addr == addr) {
+            return &mem[i];
+        }
+    }
+    return NULL;
 }
 
 // insert (<addr>, <val>) into your fake memory.  
@@ -89,7 +97,16 @@ static mem_t* lookup(volatile void *addr) {
 //   - before: <addr> is not in fake memory.
 //   - after: <addr> is in fake memory and lookup returns the corect <val>
 static mem_t *insert(volatile void *addr, unsigned val) {
-    unimplemented();
+    assert(lookup(addr) == NULL);
+    for (size_t i = 0; i < N; i++) {
+        if (mem[i].addr == NULL) {
+            mem[i].addr = addr;
+            mem[i].val = val;
+            return &mem[i];
+        }
+    }
+    panic("memory exhausted");
+    return NULL;
 }
 
 // return the value associated with <addr>.  if this <addr> has not been written
@@ -97,7 +114,12 @@ static mem_t *insert(volatile void *addr, unsigned val) {
 //
 // before you return, call print_read on the mem_t associated with <addr>.
 unsigned get32(volatile void *addr) {
-    unimplemented();
+    mem_t *m = lookup(addr);
+    if (m == NULL) {
+        m = insert(addr, rand());
+    }
+    print_read(m);
+    return m->val;
 }
 
 // write (<addr>, <val>) into your fake memory.  if the <addr> is already in fake
@@ -105,5 +127,11 @@ unsigned get32(volatile void *addr) {
 // 
 // before you return, call print_write on the mem_t associated with <addr>.
 void put32(volatile void *addr, unsigned val) {
-    unimplemented();
+    mem_t *m = lookup(addr);
+    if (m == NULL) {
+        m = insert(addr, val);
+    } else {
+        m->val = val;
+    }
+    print_write(m);
 }
