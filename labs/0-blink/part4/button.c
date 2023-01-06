@@ -84,8 +84,8 @@ void delay(unsigned ticks) {
         asm("add r1, r1, #0");
 }
 
-// when you run should blink 10 times. will have to restart the pi by pulling the
-// usb connection out.
+// when you run should react on button. 
+// will turn on the LED when button is pressed and turn off otherwise.
 void notmain(void) {
     int led = 20;
     int but = 21;
