@@ -25,16 +25,18 @@
 //     should eventually implement your own.
 //
 void hall_init_a1104(int input) {
-    unimplemented();
+    gpio_set_input(input);
+    gpio_set_pullup(input);
 }
 
 // use gpio_read() to return 1 if magnet touching, 0 otherwise.
 int hall_read(int hall) {
-    unimplemented();
+    return gpio_read(hall);
 }
 
 void notmain(void) {
     uart_init();
+
 
     printk("starting hall effect!\n");
     int hall = 21;
@@ -47,6 +49,15 @@ void notmain(void) {
 
         while(hall_read(hall) == 1) {}
         printk("no magnet!\n");
+        /*
+        int sensor = hall_read(hall);
+        printk("%06d: sensor = %d\n", i, sensor);
+        if (sensor)
+            printk("no magnet!\n");
+        else
+            printk("sensed magnet!\n");
+        delay_ms(1000);
+        */
     }
     printk("stopping hall effect!\n");
     clean_reboot();
