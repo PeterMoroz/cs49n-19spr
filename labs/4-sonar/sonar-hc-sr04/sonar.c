@@ -11,7 +11,12 @@ static unsigned timeout = 55000;
 //  1. gpio_read(pin) != v ==> return 1.
 //  2. <timeout> microseconds have passed ==> return 0
 int read_while_eq(int pin, int v, unsigned timeout) {
-    unimplemented();
+    unsigned t = timer_get_usec();
+    while (timer_get_usec() - t < timeout) {
+        if (gpio_read(pin) != v)
+            return 1;
+    }
+    return 0;
 }
 
 // common pattern: devices usually have various bits of internal state.  wrap
@@ -38,7 +43,10 @@ typedef struct {
 // The comments on the sparkfun product page might be helpful.
 hc_sr04_t hc_sr04_init(int trigger, int echo) {
     hc_sr04_t h = { .trigger = trigger, .echo = echo };
-    unimplemented();
+    gpio_set_output(trigger);
+    gpio_set_input(echo);
+    gpio_write(trigger, 0); 
+    delay_ms(2000);
     return h;
 }
 
@@ -61,7 +69,18 @@ hc_sr04_t hc_sr04_init(int trigger, int echo) {
 // 	signal.
 //
 int hc_sr04_get_distance(hc_sr04_t *h) {
-    unimplemented();
+    gpio_write(h->trigger, 1);
+    delay_us(10);
+    gpio_write(h->trigger, 0);
+
+    if (read_while_eq(h->echo, 0, timeout)) {
+        unsigned t = timer_get_usec();
+        if (read_while_eq(h->echo, 1, timeout)) {
+            unsigned dt = timer_get_usec() - t;
+            return dt / 148;
+        }
+    }
+
     return -1;
 }
 
