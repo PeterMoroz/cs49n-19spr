@@ -74,7 +74,10 @@ void gpio_set_input(unsigned pin) {
 
 // set <pin> to <v> (v \in {0,1})
 void gpio_write(unsigned pin, unsigned v) {
-    // 
+    if (v) 
+        gpio_set_on(pin);
+    else
+        gpio_set_off(pin);
 }
 
 unsigned gpio_read(unsigned pin) {
