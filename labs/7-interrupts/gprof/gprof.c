@@ -13,6 +13,13 @@
  * trivial kmalloc:  
  *	- do first.  check that its output makes sense!
  */
+static unsigned *heap = NULL;
+static unsigned heap_size = 0;
+static unsigned heap_used = 0;
+
+static unsigned *gprof_tbl = NULL;
+static const unsigned start = 0x8000;
+
 
 // useful for rounding up.   e.g., roundup(n,8) to roundup <n> to 8 byte
 // alignment.
@@ -25,7 +32,13 @@
  * 	- should be just a few lines of code.
  */
 void *kmalloc(unsigned nbytes) {
-    unimplemented();
+    unsigned nbytes_aligned = roundup(nbytes, 8);
+    if (nbytes_aligned + heap_used > heap_size)
+        return NULL;
+    void *block = heap + heap_size;
+    memset(block, 0, nbytes_aligned);
+    heap_size += nbytes_aligned;
+    return block;
 }
 
 /*
@@ -33,7 +46,9 @@ void *kmalloc(unsigned nbytes) {
  * 	- should be just a few lines of code.
  */
 void kmalloc_init(void) {
-    unimplemented();
+    extern unsigned __heap_start__;
+    heap = &__heap_start__;
+    heap_size = 65536;
 }
 
 /***************************************************************************
@@ -47,20 +62,29 @@ void kmalloc_init(void) {
 // allocate table.
 //    few lines of code
 static unsigned gprof_init(void) {
-    unimplemented();
+    gprof_tbl = kmalloc(4096);
+    assert(gprof_tbl != NULL);
+    return 0;
 }
 
 // increment histogram associated w/ pc.
 //    few lines of code
 static void gprof_inc(unsigned pc) {
-    unimplemented();
+    pc -= start;
+    pc >>= 2;
+    assert(pc < 1024);
+    gprof_tbl[pc] += 1;
 }
 
 // print out all samples whose count > min_val
 //
 // make sure sampling does not pick this code up!
 static void gprof_dump(unsigned min_val) {
-    unimplemented();
+    for (size_t i = 0; i < 1024; i++) {
+        if (gprof_tbl[i] > min_val) {
+            printk("%04x: %u\n", (i << 2) + start, gprof_tbl[i]);
+        }
+    }
 }
 
 
@@ -114,8 +138,8 @@ void notmain() {
     printk("gonna enable ints globally!\n");
 
     // Q: if you move these below interrupt enable?
-    gprof_init();
     kmalloc_init();
+    gprof_init();
 
     // Q: if you don't do?
     printk("gonna enable ints globally!\n");
