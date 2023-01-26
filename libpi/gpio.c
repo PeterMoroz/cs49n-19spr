@@ -10,6 +10,9 @@ volatile unsigned *gpio_fsel0 = (volatile unsigned *)(GPIO_BASE + 0x00);
 volatile unsigned *gpio_set0  = (volatile unsigned *)(GPIO_BASE + 0x1C);
 volatile unsigned *gpio_clr0  = (volatile unsigned *)(GPIO_BASE + 0x28);
 volatile unsigned *gpio_lvl   = (volatile unsigned *)(GPIO_BASE + 0x34);
+volatile unsigned *gpio_gpeds0 = (volatile unsigned *)(GPIO_BASE + 0x40);
+volatile unsigned *gpio_gpren0 = (volatile unsigned *)(GPIO_BASE + 0x4C);
+volatile unsigned *gpio_gpfen0 = (volatile unsigned *)(GPIO_BASE + 0x58);
 
 void gpio_set_function(unsigned pin, gpio_func_t function) {
     if (pin >= 32) {
@@ -87,3 +90,33 @@ unsigned gpio_read(unsigned pin) {
     return (get32(gpio_lvl) & (0x1 << pin)) != 0;
 }
 
+
+void gpio_int_rising_edge(unsigned pin) {
+    if (pin >= 32) {
+        return;
+    }
+
+    put32(gpio_gpren0, get32(gpio_gpren0) | (1 << pin));
+}
+
+void gpio_int_falling_edge(unsigned pin) {
+    if (pin >= 32) {
+        return;
+    }
+
+    put32(gpio_gpfen0, get32(gpio_gpfen0) | (1 << pin));
+}
+
+int gpio_event_detected(unsigned pin) {
+    if (pin >= 32) {
+        return 0;
+    }
+    return (get32(gpio_gpeds0) & (1 << pin)) != 0;
+}
+
+void gpio_event_clear(unsigned pin) {
+    if (pin >= 32) {
+        return;
+    }
+    put32(gpio_gpeds0, (1 << pin));
+}
