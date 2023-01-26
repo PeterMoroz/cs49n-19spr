@@ -8,6 +8,7 @@
 
 */
 #include "rpi.h"
+#include "gpio-interrupt.h"
 #include "timer-interrupt.h"
 
 
@@ -21,37 +22,73 @@ static volatile unsigned led_off_ticks = MAX_LED_TICKS;
 static uint8_t led_on = 0;
 static unsigned ticks = MAX_LED_TICKS;
 
+#define TRIGGER_PIN 20
+#define ECHO_PIN 21
+
+static unsigned last_trigger = 0;
+static unsigned trigger_on_at = 0;
+static uint8_t trigger_on = 0;
+
+static unsigned echo_on_at = 0;
+static volatile unsigned echo_dt = 0;
+
+
+void gpio_int_rising_edge(unsigned pin);
+
 // client has to define this.
 void interrupt_vector(unsigned pc) {
     unsigned pending = get32(&RPI_GetIRQController()->IRQ_basic_pending);
 
-    // if this isn't true, could be a GPU interrupt: just return.
-    // [confusing, since we didn't enable!]
-    if((pending & RPI_BASIC_ARM_TIMER_IRQ) == 0)
-        return;
+    if((pending & RPI_BASIC_ARM_TIMER_IRQ) != 0)
+    {
+        // Clear the ARM Timer interrupt
+        put32(&RPI_GetArmTimer()->IRQClear, 1);
 
-    /* 
-     * Clear the ARM Timer interrupt - it's the only interrupt we have
-     * enabled, so we want don't have to work out which interrupt source
-     * caused us to interrupt 
-     *
-     */
-    put32(&RPI_GetArmTimer()->IRQClear, 1);
-
-
-    if (ticks == 0) {
-        if (led_on) {
-            led_on = 0;
-            ticks = led_off_ticks;
-            gpio_set_off(LED_PIN);
+        if (ticks == 0) {
+            if (led_on) {
+                led_on = 0;
+                ticks = led_off_ticks;
+                gpio_set_off(LED_PIN);
+            } else {
+                led_on = 1;
+                ticks = led_on_ticks;
+                gpio_set_on(LED_PIN);
+            }
         } else {
-            led_on = 1;
-            ticks = led_on_ticks;
-            gpio_set_on(LED_PIN);
+            ticks--;
         }
-    } else {
-        ticks--;
+
+        if (trigger_on && timer_get_usec() - trigger_on_at > 10) {
+            trigger_on = 0;
+            gpio_set_off(TRIGGER_PIN);
+        }
+
+        if (timer_get_usec() - last_trigger > 100000) {
+            trigger_on_at = last_trigger = timer_get_usec();
+            trigger_on = 1;
+            gpio_set_on(TRIGGER_PIN);
+        }
+
     }
+
+
+    if ((pending & RPI_BASIC_PENDING2_IRQ) != 0)
+    {
+        if (gpio_event_detected(ECHO_PIN))
+        {
+            unsigned v = gpio_read(ECHO_PIN);
+            gpio_event_clear(ECHO_PIN);
+
+            if (v == 1) {
+                echo_on_at = timer_get_usec();
+            }
+
+            if (v == 0) {
+                echo_dt = timer_get_usec() - echo_on_at;
+            }
+        }
+    }
+
 }
 
 
@@ -97,7 +134,10 @@ hc_sr04_t hc_sr04_init(int trigger, int echo) {
     hc_sr04_t h = { .trigger = trigger, .echo = echo };
     gpio_set_output(trigger);
     gpio_set_input(echo);
-    gpio_write(trigger, 0); 
+    gpio_set_pulldown(echo);
+    gpio_int_falling_edge(echo);
+    gpio_int_rising_edge(echo);
+    gpio_write(trigger, 0);
     delay_ms(2000);
     return h;
 }
@@ -137,6 +177,8 @@ int hc_sr04_get_distance(hc_sr04_t *h) {
 }
 
 
+
+
 void notmain() {
     uart_init();
 
@@ -149,16 +191,19 @@ void notmain() {
     printk("setting up timer interrupts\n");
     timer_interrupt_init(0x1);
 
+    printk("setting up GPIO interrupts\n");
+    gpio_interrupt_init(GPIO_INT0);
+
     printk("gonna enable ints globally!\n");
     
     system_enable_interrupts();
     printk("enabled!\n");
 
 	  printk("starting sonar!\n");
-    hc_sr04_t h = hc_sr04_init(20, 21);
+    hc_sr04_t h = hc_sr04_init(TRIGGER_PIN, ECHO_PIN);
     printk("sonar ready!\n");
 
-
+/*
     for(int dist, i = 0; i < 100; i++) {
         // read until no timeout.
         while((dist = hc_sr04_get_distance(&h)) < 0)
@@ -166,11 +211,27 @@ void notmain() {
         printk("distance = %d inches\n", dist);
         if (dist > 20)
             dist = 20;
+        
         led_on_ticks = (20 - dist) * 50;
         if (led_on_ticks > MAX_LED_TICKS)
             led_on_ticks = MAX_LED_TICKS;
         led_off_ticks = MAX_LED_TICKS;
         delay_ms(100);
+    }
+
+*/
+    unsigned cnt = 0;
+    while (cnt < 1000) {
+        unsigned distance = echo_dt / 148;
+        printk("distance = %u\n", distance);
+
+        led_on_ticks = (20 - (distance > 20 ? 20 : distance)) * 50;
+        if (led_on_ticks > MAX_LED_TICKS)
+            led_on_ticks = MAX_LED_TICKS;
+        led_off_ticks = MAX_LED_TICKS;
+
+        delay_ms(100);
+        cnt++;
     }
 
     clean_reboot();

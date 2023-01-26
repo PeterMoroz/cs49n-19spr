@@ -9,10 +9,6 @@
 #include "rpi.h"
 #include "timer-interrupt.h"
 
-volatile rpi_irq_controller_t* RPI_GetIRQController(void) {
-    mb();
-    return (void*)0x2000B200;
-}
 
 /** @brief See the documentation for the ARM side timer (Section 14 of the
     BCM2835 Peripherals PDF) */

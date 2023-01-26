@@ -2,8 +2,6 @@
 #include "rpi-interrupts.h"
 
 
-
-
 // initialize global interrupt state.
 void int_init(void) {
     // put interrupt flags in known state. 
@@ -28,6 +26,13 @@ void int_init(void) {
     for(int i = 0; i < n; i++)
         dst[i] = src[i];
 }
+
+
+volatile rpi_irq_controller_t* RPI_GetIRQController(void) {
+    mb();
+    return (void*)0x2000B200;
+}
+
 
 #define UNHANDLED(msg,r) \
 	panic("ERROR: unhandled exception <%s> at PC=%x\n", msg,r)

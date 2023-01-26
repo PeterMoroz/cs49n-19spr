@@ -1,7 +1,7 @@
 # change this name to whatever your program is called
 NAME=sonar-int
 # add any additional .o's here
-OBJS = $(NAME).o interrupts-asm.o interrupts-c.o cstart.o  timer-interrupt.o
+OBJS = $(NAME).o interrupts-asm.o interrupts-c.o cstart.o  timer-interrupt.o gpio-interrupt.o
 
 CFLAGS += -O2
 # check that your path is defined.
